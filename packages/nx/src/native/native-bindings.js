@@ -364,6 +364,7 @@ if (!nativeBinding) {
 module.exports.ChildProcess = nativeBinding.ChildProcess
 module.exports.HashPlanner = nativeBinding.HashPlanner
 module.exports.ImportResult = nativeBinding.ImportResult
+module.exports.NxCache = nativeBinding.NxCache
 module.exports.RustPseudoTerminal = nativeBinding.RustPseudoTerminal
 module.exports.TaskHasher = nativeBinding.TaskHasher
 module.exports.Watcher = nativeBinding.Watcher

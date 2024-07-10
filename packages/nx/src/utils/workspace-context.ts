@@ -1,8 +1,9 @@
 import type { NxWorkspaceFilesExternals, WorkspaceContext } from '../native';
 import { performance } from 'perf_hooks';
-import { cacheDirectoryForWorkspace } from './cache-directory';
+import { workspaceDataDirectory } from './cache-directory';
 import { isOnDaemon } from '../daemon/is-on-daemon';
 import { daemonClient } from '../daemon/client/client';
+import { Task } from '../config/task-graph';
 
 let workspaceContext: WorkspaceContext | undefined;
 
@@ -12,7 +13,7 @@ export function setupWorkspaceContext(workspaceRoot: string) {
   performance.mark('workspace-context');
   workspaceContext = new WorkspaceContext(
     workspaceRoot,
-    cacheDirectoryForWorkspace(workspaceRoot)
+    workspaceDataDirectory
   );
   performance.mark('workspace-context:end');
   performance.measure(
@@ -114,6 +115,37 @@ export function updateProjectFiles(
     deletedFiles
   );
 }
+
+// export function putTaskResultsIntoCache(
+//   workspaceRoot: string,
+//   task: Task,
+//   terminalOutput: string | null,
+//   outputs: string[],
+//   code: number
+// ) {
+//   // if (isOnDaemon() || !daemonClient.enabled()) {
+//   ensureContextAvailable(workspaceRoot);
+//   return workspaceContext.putIntoCache(
+//     {
+//       hash: task.hash,
+//     },
+//     terminalOutput,
+//     outputs,
+//     code
+//   );
+//   // }
+//   // return daemonClient.getWorkspaceFiles(projectRootMap);
+// }
+//
+// export function getTaskResultsFromCache(workspaceRoot: string, task: Task) {
+//   // if (isOnDaemon() || !daemonClient.enabled()) {
+//   ensureContextAvailable(workspaceRoot);
+//   return workspaceContext.getFromCache({
+//     hash: task.hash,
+//   });
+//   // }
+//   // return daemonClient.getWorkspaceFiles(projectRootMap);
+// }
 
 function ensureContextAvailable(workspaceRoot: string) {
   if (!workspaceContext || workspaceContext?.workspaceRoot !== workspaceRoot) {

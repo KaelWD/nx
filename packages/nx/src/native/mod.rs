@@ -15,3 +15,4 @@ pub mod watch;
 pub mod workspace;
 
 pub mod wasm;
+mod db;

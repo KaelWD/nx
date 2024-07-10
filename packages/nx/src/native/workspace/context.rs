@@ -1,19 +1,19 @@
-use napi::bindgen_prelude::External;
 use std::collections::HashMap;
-
-use crate::native::hasher::hash;
-use crate::native::utils::{path::get_child_files, Normalize, NxMutex, NxCondvar};
-use rayon::prelude::*;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 
+use napi::bindgen_prelude::External;
+use rayon::prelude::*;
+use tracing::{trace, warn};
+
+use crate::native::cache::cache::{CachedResult, NxCache, TaskResult};
+use crate::native::hasher::hash;
 use crate::native::logger::enable_logger;
 use crate::native::project_graph::utils::{find_project_for_path, ProjectRootMappings};
 use crate::native::types::FileData;
-use tracing::{trace, warn};
-
+use crate::native::utils::{path::get_child_files, Normalize, NxCondvar, NxMutex};
 use crate::native::workspace::files_archive::{read_files_archive, write_files_archive};
 use crate::native::workspace::files_hashing::{full_files_hash, selective_files_hash};
 use crate::native::workspace::types::{
@@ -30,7 +30,7 @@ pub struct WorkspaceContext {
 
 type Files = Vec<(PathBuf, String)>;
 
-fn gather_and_hash_files(workspace_root: &Path, cache_dir: String) -> Vec<(PathBuf, String)>{
+fn gather_and_hash_files(workspace_root: &Path, cache_dir: String) -> Vec<(PathBuf, String)> {
     let archived_files = read_files_archive(&cache_dir);
 
     trace!("Gathering files in {}", workspace_root.display());
@@ -116,10 +116,14 @@ impl FilesWorker {
             let files = files_lock.lock().expect("Should be able to lock files");
 
             #[cfg(target_arch = "wasm32")]
-            let mut files = cvar.wait(files, |guard| guard.len() == 0).expect("Should be able to wait for files");
+            let mut files = cvar
+                .wait(files, |guard| guard.len() == 0)
+                .expect("Should be able to wait for files");
 
             #[cfg(not(target_arch = "wasm32"))]
-            let files = cvar.wait(files, |guard| guard.len() == 0).expect("Should be able to wait for files");
+            let files = cvar
+                .wait(files, |guard| guard.len() == 0)
+                .expect("Should be able to wait for files");
 
             let file_data = files
                 .iter()
@@ -150,7 +154,9 @@ impl FilesWorker {
         };
 
         let (files_lock, _) = &files_sync.deref();
-        let mut files = files_lock.lock().expect("Should always be able to update files");
+        let mut files = files_lock
+            .lock()
+            .expect("Should always be able to update files");
         let mut map: HashMap<PathBuf, String> = files.drain(..).collect();
 
         for deleted_path in deleted_files_and_directories {
@@ -162,7 +168,6 @@ impl FilesWorker {
                     let owned_deleted_path = deleted_path.to_owned();
                     !path.starts_with(owned_deleted_path + "/")
                 });
-
             };
         }
 
@@ -194,18 +199,18 @@ impl FilesWorker {
 #[napi]
 impl WorkspaceContext {
     #[napi(constructor)]
-    pub fn new(workspace_root: String, cache_dir: String) -> Self {
+    pub fn new(workspace_root: String, cache_dir: String) -> anyhow::Result<Self> {
         enable_logger();
 
         trace!(?workspace_root);
 
         let workspace_root_path = PathBuf::from(&workspace_root);
 
-        WorkspaceContext {
-            files_worker: FilesWorker::gather_files(&workspace_root_path, cache_dir),
+        Ok(WorkspaceContext {
+            files_worker: FilesWorker::gather_files(&workspace_root_path, cache_dir.clone()),
             workspace_root,
             workspace_root_path,
-        }
+        })
     }
 
     #[napi]
@@ -345,4 +350,14 @@ impl WorkspaceContext {
     pub fn get_files_in_directory(&self, directory: String) -> Vec<String> {
         get_child_files(directory, self.files_worker.get_files())
     }
+
+    // #[napi]
+    // pub fn put_into_cache(&self, task: TaskResult, terminal_output: String, outputs: Vec<String>, code: i16) -> anyhow::Result<()> {
+    //     self.cache.put(task, terminal_output, outputs, code)
+    // }
+    //
+    // #[napi]
+    // pub fn get_from_cache(&self, task: TaskResult) -> anyhow::Result<Option<CachedResult>> {
+    //     self.cache.get(task)
+    // }
 }
